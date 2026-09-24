@@ -1,6 +1,12 @@
 import pytest
 
-from model.chiplettrust_model import EndpointModel, Lifecycle, ManagerModel, attestation_mix
+from model.chiplettrust_model import (
+    EndpointModel,
+    Lifecycle,
+    ManagerModel,
+    attestation_mix,
+    bind_session_challenge,
+)
 
 
 def provisioned_endpoint() -> EndpointModel:
@@ -127,3 +133,41 @@ def test_replay_cache_has_bounded_window():
         assert ep.accept_fresh_request(sid, 0x1000 + sid)
     assert ep.accept_fresh_request(4, 0x1004)
     assert ep.accept_fresh_request(0, 0x1000)
+
+
+def test_session_attestation_matches_bound_reference():
+    ep = provisioned_endpoint()
+    sid = 0x44
+    challenge = 0x10203040
+    expected = attestation_mix(
+        bind_session_challenge(sid, challenge),
+        ep.device_id,
+        ep.digest,
+        ep.secret_word,
+        1,
+    )
+    assert ep.attest_session(sid, challenge) == expected
+
+
+def test_session_attestation_rejects_exact_replay():
+    ep = provisioned_endpoint()
+    ep.attest_session(0x10, 0xAA01)
+    with pytest.raises(ValueError, match="replayed"):
+        ep.attest_session(0x10, 0xAA01)
+
+
+def test_session_binding_changes_response_for_new_session():
+    ep = provisioned_endpoint()
+    challenge = 0xAA01
+    first = ep.attest_session(0x10, challenge)
+    second = ep.attest_session(0x11, challenge)
+    assert first != second
+
+
+def test_invalid_key_does_not_consume_freshness_pair():
+    ep = EndpointModel(device_id=1, secret_word=2)
+    with pytest.raises(PermissionError):
+        ep.attest_session(0x77, 0x1234)
+
+    assert ep.transition(Lifecycle.PROVISIONED)
+    ep.attest_session(0x77, 0x1234)
