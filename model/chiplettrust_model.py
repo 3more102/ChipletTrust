@@ -1,4 +1,4 @@
-"""Golden model for ChipletTrust M0.
+"""Golden model for ChipletTrust M1.
 
 The attestation transform is intentionally non-cryptographic. It mirrors the
 RTL so verification can be deterministic before a real crypto backend exists.
@@ -47,6 +47,11 @@ def attestation_mix(challenge: int, device_id: int, digest: int, secret: int, no
     return (rotl32(x, 7) ^ ((x + 0x9E37_79B9) & MASK32)) & MASK32
 
 
+def bind_session_challenge(session_id: int, challenge: int) -> int:
+    """Mirror the M1 RTL transcript-binding transform."""
+    return (challenge ^ rotl32(session_id, 13) ^ 0x5345_5353) & MASK32
+
+
 @dataclass
 class EndpointModel:
     device_id: int
@@ -90,7 +95,9 @@ class EndpointModel:
     def attest(self, challenge: int) -> int:
         if not self.key_valid:
             raise PermissionError("attestation key unavailable in current lifecycle")
-        response = attestation_mix(challenge, self.device_id, self.digest, self.secret_word, self.nonce)
+        response = attestation_mix(
+            challenge, self.device_id, self.digest, self.secret_word, self.nonce
+        )
         self.nonce = (self.nonce + 1) & MASK32
         return response
 
@@ -102,6 +109,20 @@ class EndpointModel:
             self.replay_cache.pop(0)
         self.replay_cache.append(key)
         return True
+
+    def attest_session(self, session_id: int, challenge: int) -> int:
+        """Attest a fresh session/challenge pair using M1 transcript binding."""
+        if not self.key_valid:
+            raise PermissionError("attestation key unavailable in current lifecycle")
+        if not self.accept_fresh_request(session_id, challenge):
+            raise ValueError("replayed session/challenge pair")
+
+        bound = bind_session_challenge(session_id, challenge)
+        response = attestation_mix(
+            bound, self.device_id, self.digest, self.secret_word, self.nonce
+        )
+        self.nonce = (self.nonce + 1) & MASK32
+        return response
 
 
 @dataclass
