@@ -107,3 +107,23 @@ def test_heartbeat_resets_timeout_counter():
     mgr.heartbeat_tick(0, seen=True)
     mgr.heartbeat_tick(0, seen=False)
     assert not mgr.isolated[0]
+
+
+def test_replay_cache_rejects_same_session_challenge_pair():
+    ep = provisioned_endpoint()
+    assert ep.accept_fresh_request(0x10, 0xAA01)
+    assert not ep.accept_fresh_request(0x10, 0xAA01)
+
+
+def test_replay_cache_allows_same_challenge_in_new_session():
+    ep = provisioned_endpoint()
+    assert ep.accept_fresh_request(0x10, 0xAA01)
+    assert ep.accept_fresh_request(0x11, 0xAA01)
+
+
+def test_replay_cache_has_bounded_window():
+    ep = provisioned_endpoint()
+    for sid in range(4):
+        assert ep.accept_fresh_request(sid, 0x1000 + sid)
+    assert ep.accept_fresh_request(4, 0x1004)
+    assert ep.accept_fresh_request(0, 0x1000)
