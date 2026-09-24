@@ -21,11 +21,11 @@ module tb_chiplettrust;
     .trusted(trusted), .isolated(isolated), .heartbeat_fault(heartbeat_fault)
   );
 
-  task pulse_attestation(input int idx, input logic matches);
+  task pulse_attestation(input int idx, input logic match_value);
     begin
       @(negedge clk);
       attest_done[idx]  = 1'b1;
-      attest_match[idx] = matches;
+      attest_match[idx] = match_value;
       @(negedge clk);
       attest_done[idx]  = 1'b0;
       attest_match[idx] = 1'b0;
