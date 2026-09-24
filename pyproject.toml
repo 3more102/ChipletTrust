@@ -1,0 +1,10 @@
+[project]
+name = "chiplettrust"
+version = "0.1.0"
+description = "Reference and verification models for ChipletTrust"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["."]
