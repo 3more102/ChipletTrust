@@ -54,6 +54,8 @@ class EndpointModel:
     lifecycle: Lifecycle = Lifecycle.RAW
     pcr: list[int] = field(default_factory=lambda: [0, 0, 0, 0])
     nonce: int = 1
+    replay_cache_depth: int = 4
+    replay_cache: list[tuple[int, int]] = field(default_factory=list)
 
     def transition(self, new_state: Lifecycle) -> bool:
         if new_state not in ALLOWED[self.lifecycle]:
@@ -88,11 +90,18 @@ class EndpointModel:
     def attest(self, challenge: int) -> int:
         if not self.key_valid:
             raise PermissionError("attestation key unavailable in current lifecycle")
-        response = attestation_mix(
-            challenge, self.device_id, self.digest, self.secret_word, self.nonce
-        )
+        response = attestation_mix(challenge, self.device_id, self.digest, self.secret_word, self.nonce)
         self.nonce = (self.nonce + 1) & MASK32
         return response
+
+    def accept_fresh_request(self, session_id: int, challenge: int) -> bool:
+        key = (session_id & MASK32, challenge & MASK32)
+        if key in self.replay_cache:
+            return False
+        if len(self.replay_cache) >= self.replay_cache_depth:
+            self.replay_cache.pop(0)
+        self.replay_cache.append(key)
+        return True
 
 
 @dataclass
