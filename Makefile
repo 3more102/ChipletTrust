@@ -22,6 +22,13 @@ rtl:
 		rtl/security/replay_guard.sv \
 		tb/tb_replay_guard.sv
 	vvp build/replay_guard_tb
+	iverilog -g2012 -s tb_secure_attestation_session -o build/secure_session_tb \
+		rtl/common/chiplettrust_pkg.sv \
+		rtl/security/replay_guard.sv \
+		rtl/security/attestation_engine.sv \
+		rtl/security/secure_attestation_session.sv \
+		tb/tb_secure_attestation_session.sv
+	vvp build/secure_session_tb
 
 clean:
 	rm -rf build .pytest_cache __pycache__ model/__pycache__ tests/__pycache__
